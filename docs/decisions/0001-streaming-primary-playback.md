@@ -37,7 +37,15 @@ Concretely:
 
 ## Open questions (must resolve before this ADR is Accepted)
 
-1. **Parent-side preview under the cap (critical path).** Parents must hear the clip to set the drop (SONG-2/SONG-5, MUST), but rendering Spotify audio needs preview URLs (removed) or the parent's own Premium session (counts against the 5-user cap → breaks for normal team sizes). Candidate sources for parent preview: iTunes Search API 30s previews (free, no auth), Deezer 30s previews (free), or YouTube. Each reopens a *preview-only* rendition-parity question. **Needs a dedicated research pass.**
+1. **Parent-side preview under the cap — RESOLVED (working approach).** Parents must hear the clip to set the drop (SONG-2/SONG-5, MUST). Rendering Spotify audio needs preview URLs (removed) or a Premium session; individual parent Premium logins would each consume one of the 5 Development-Mode user slots, which breaks for normal team sizes.
+
+   **Decision:** Route all parent previews through a single shared **Spotify Premium "service account."** The backend holds that account's refresh token and issues short-lived access tokens to each parent's browser session (parents never see credentials); the Web Playback SDK renders preview audio under the service account. Spotify sees **1 authorized user** regardless of parent count, so the 5-user cap is satisfied. Parents without their own Premium are unaffected — they preview through the service account too. (An alternate-source path — iTunes/Deezer 30s previews — was considered and set aside to avoid added complexity.)
+
+   **Accepted caveats:**
+   - **Single concurrent stream per Premium account.** Two parents previewing simultaneously will interrupt each other (Spotify plays on one active device per account). Tolerable because preview is asynchronous and short; worst case is deadline-crunch clustering. Parents-vs-parents collisions only (see mitigation).
+   - **ToS account-sharing.** One account used by many people is against Spotify ToS and resembles abuse patterns (many devices/IPs on one account) — small risk of the account being flagged/throttled. Sits within the accepted gray-area risk posture (C-4).
+
+   **Mitigation:** Use a **separate** Premium account for the operator's game-day playback than the parent-preview service account (2 of the 5 owned accounts, split by role), so parent preview activity can never interrupt live game-day playback.
 2. **Fade-out feasibility** over Connect REST — verify whether an acceptable fade is achievable, or whether fade is a local-file-only feature.
 3. **Offline fallback scope** — exactly what is cached, when, and how the console chooses between streaming and cached playback without operator friction.
 
